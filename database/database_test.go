@@ -1,14 +1,16 @@
 package database_test
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/danhawkins/go-dockertest-example/database"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func TestMain(m *testing.M) {
@@ -24,7 +26,7 @@ func TestMain(m *testing.M) {
 		log.Fatalf("Could not connect to Docker: %s", err)
 	}
 
-	postgres, err := pool.RunWithOptions(&dockertest.RunOptions{
+	pg, err := pool.RunWithOptions(&dockertest.RunOptions{
 		Repository: "postgres",
 		Tag:        "15",
 		Env: []string{
@@ -44,14 +46,23 @@ func TestMain(m *testing.M) {
 		log.Fatalf("Could not start resource: %s", err)
 	}
 
-	postgres.Expire(10)
+	pg.Expire(10)
 
 	// Set this so our app can use it
-	postgresPort := postgres.GetPort("5432/tcp")
+	postgresPort := pg.GetPort("5432/tcp")
 	os.Setenv("POSTGRES_PORT", postgresPort)
 
-	// Wait 1 second for the container to start
-	time.Sleep(1 * time.Second)
+	// Wait for the HTTP endpoint to be ready
+	if err := pool.Retry(func() error {
+		_, connErr := gorm.Open(postgres.Open(fmt.Sprintf("postgresql://postgres@localhost:%s/example", postgresPort)), &gorm.Config{})
+		if connErr != nil {
+			return connErr
+		}
+
+		return nil
+	}); err != nil {
+		panic("Could not connect to postgres: " + err.Error())
+	}
 
 	code := m.Run()
 
