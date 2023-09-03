@@ -1,39 +1,18 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"os"
 
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
-
+	"github.com/danhawkins/go-dockertest-example/database"
 	_ "github.com/joho/godotenv/autoload"
 )
 
-type (
-	Person struct {
-		gorm.Model
-		Name string
-		Age  uint
-	}
-)
-
 func main() {
-	log.Println("Setting up the database")
+	database.Connect()
 
-	pgUrl := fmt.Sprintf("postgresql://postgres@localhost:%s/example", os.Getenv("POSTGRES_PORT"))
-	db, err := gorm.Open(postgres.Open(pgUrl), &gorm.Config{})
-	if err != nil {
-		panic("failed to connect database")
-	}
+	database.CreatePerson()
 
-	// Migrate the schema
-	db.AutoMigrate(&Person{})
+	count := database.CountPeople()
 
-	log.Println("Creating a new person in the database")
-	person := Person{Name: "Danny", Age: 42}
-	db.Create(&person)
-
-	log.Println("Trying to write a new person to the database")
+	log.Printf("Database has %d people", count)
 }
